@@ -14,7 +14,10 @@ DEFAULT_USER_AGENT = (
     "ovapi-departures-proxy/1.0 (+https://github.com/lucasplug/ovapi-departures-proxy)"
 )
 DEFAULT_PORT = 8000
-DEFAULT_BASE_URL = "https://v0.ovapi.nl"
+# Plain HTTP: v0.ovapi.nl serves a TLS certificate issued for de.ovapi.nl, so
+# HTTPS fails certificate validation (verified 2026-07). Override via
+# OVAPI_BASE_URL if OVapi ever fixes this.
+DEFAULT_BASE_URL = "http://v0.ovapi.nl"
 
 
 @dataclass(frozen=True)

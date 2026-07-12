@@ -44,6 +44,10 @@ Met `--save-fixture tests/fixtures/tpc_live.json` sla je meteen een echte respon
 die door de testsuite wordt meegenomen. Tip: draai dit overdag; 's nachts kan de
 lijst met passes leeg zijn.
 
+Voor deze halte is de uitkomst (geverifieerd tegen de live API, juli 2026):
+**`54460130` = richting Den Haag CS**; `54460131` is de tegenrichting
+(alles richting Katwijk).
+
 ## Draaien
 
 ```bash
@@ -69,7 +73,13 @@ zijn in **seconden**.
 | `LINE_FILTER` | leeg (alles) | Alleen deze lijnen tonen, comma-separated (bv. `385`) |
 | `LIMIT` | `0` (onbeperkt) | Maximum aantal vertrekken (bv. `4`) |
 | `TZ` | `Europe/Amsterdam` | Tijdzone van de container (parsing is sowieso Europe/Amsterdam) |
-| `OVAPI_BASE_URL` | `https://v0.ovapi.nl` | Alleen voor tests/ontwikkeling |
+| `OVAPI_BASE_URL` | `http://v0.ovapi.nl` | Basis-URL van OVapi (zie noot hieronder); ook handig voor tests |
+
+> **Waarom HTTP en geen HTTPS?** `v0.ovapi.nl` serveert een TLS-certificaat dat
+> alleen voor `de.ovapi.nl` is uitgegeven, waardoor HTTPS-certificaatvalidatie
+> faalt (geverifieerd juli 2026). De data is openbare reisinformatie; vrijwel
+> alle OVapi-integraties gebruiken daarom HTTP. Mocht OVapi dit ooit fixen, zet
+> dan `OVAPI_BASE_URL=https://v0.ovapi.nl`.
 
 ## Endpoints
 

@@ -25,7 +25,9 @@ import json
 import sys
 import urllib.request
 
-BASE_URL = "https://v0.ovapi.nl"
+# Plain HTTP: v0.ovapi.nl serves a certificate issued for de.ovapi.nl, so
+# HTTPS fails validation (see README).
+BASE_URL = "http://v0.ovapi.nl"
 USER_AGENT = "ovapi-departures-proxy-setup/1.0 (find_tpc.py; one-off stop lookup)"
 
 
