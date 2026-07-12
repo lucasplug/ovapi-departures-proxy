@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- ovapi-departures-proxy ---
+# Lokale configuratie met echte waarden; alleen .env.example hoort in git.
+# (.env staat hierboven al onder "Environments", hier expliciet herhaald.)
+.env
+.env.*
+!.env.example
+# Live OVapi-capture (regenereerbaar via scripts/find_tpc.py --save-fixture)
+tests/fixtures/tpc_live.json
