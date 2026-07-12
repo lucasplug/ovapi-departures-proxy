@@ -1,0 +1,13 @@
+services:
+  ovapi-departures:
+    build: .
+    image: ovapi-departures-proxy:latest
+    container_name: ovapi-departures
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+      # Host-poort = container-poort; Home Assistant bereikt de service op
+      # http://<Docker-VM-IP>:<PORT>/departures
+      - "${PORT:-8000}:${PORT:-8000}"
