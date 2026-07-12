@@ -1,13 +1,24 @@
+# Portainer-ready: alle configuratie staat inline, er is geen .env nodig.
+# Plak dit als stack in Portainer (Stacks -> Add stack) of wijs naar deze repo.
+#
+# Andere poort? Pas dan PORT én beide kanten van de ports-mapping aan
+# (compose vult ${...} niet uit het environment-blok).
 services:
   ovapi-departures:
-    build: .
-    image: ovapi-departures-proxy:latest
+    image: ghcr.io/lucasplug/ovapi-departures-proxy:latest
     container_name: ovapi-departures
     restart: unless-stopped
-    env_file: .env
     environment:
-      TZ: Europe/Amsterdam
+      # TimingPointCode: 54460130 = Katwijk, Gemeentehuis richting Den Haag CS
+      OVAPI_TPC: "54460130"
+      # Fair use richting OVapi: minimaal 60, default 180 (seconden)
+      POLL_INTERVAL_SECONDS: "180"
+      USER_AGENT: "ovapi-departures-proxy/1.0 (+https://github.com/lucasplug/ovapi-departures-proxy)"
+      PORT: "8000"
+      # Alleen deze lijnen tonen (comma-separated); leeg = alle lijnen
+      LINE_FILTER: "385"
+      # Maximum aantal vertrekken in /departures; 0 = onbeperkt
+      LIMIT: "4"
+      TZ: "Europe/Amsterdam"
     ports:
-      # Host-poort = container-poort; Home Assistant bereikt de service op
-      # http://<Docker-VM-IP>:<PORT>/departures
-      - "${PORT:-8000}:${PORT:-8000}"
+      - "8000:8000"
