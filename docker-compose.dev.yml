@@ -1,0 +1,15 @@
+# Lokaal ontwikkelen: bouwt het image uit deze repo en leest de configuratie
+# uit een .env-bestand (cp .env.example .env).
+#
+#   docker compose -f docker-compose.dev.yml up -d --build
+services:
+  ovapi-departures:
+    build: .
+    image: ovapi-departures-proxy:dev
+    container_name: ovapi-departures-dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"

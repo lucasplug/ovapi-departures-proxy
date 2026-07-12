@@ -48,16 +48,37 @@ Voor deze halte is de uitkomst (geverifieerd tegen de live API, juli 2026):
 **`54460130` = richting Den Haag CS**; `54460131` is de tegenrichting
 (alles richting Katwijk).
 
-## Draaien
+## Draaien (Portainer / productie)
+
+`docker-compose.yml` is zelfstandig: alle environment variables staan inline en
+het gebruikt het kant-en-klare image van GHCR — er is geen `.env` of repo-clone
+nodig. In Portainer: **Stacks → Add stack → Web editor**, plak de inhoud van
+`docker-compose.yml`, pas waar nodig de waarden aan en deploy. (Of kies
+*Repository* en wijs naar deze repo.)
 
 ```bash
-cp .env.example .env        # en vul OVAPI_TPC (stap 1), LINE_FILTER, etc. in
-docker compose up -d --build
+# zonder Portainer, op de Docker-VM:
+docker compose up -d
 curl http://localhost:8000/departures
 ```
 
+Let op: om `ghcr.io/lucasplug/ovapi-departures-proxy` te kunnen pullen moet het
+package op GitHub op *public* staan (of log in met `docker login ghcr.io`).
+Nieuwe release uitrollen: `docker compose pull && docker compose up -d`.
+
 De service bindt op `0.0.0.0`, zodat hij ook vanaf andere machines (zoals de
-Home Assistant-VM) bereikbaar is op `http://<Docker-VM-IP>:<PORT>`.
+Home Assistant-VM) bereikbaar is op `http://<Docker-VM-IP>:<PORT>`. Een andere
+poort kiezen = zowel `PORT` als beide kanten van de `ports:`-mapping aanpassen.
+
+## Draaien (lokaal ontwikkelen)
+
+`docker-compose.dev.yml` bouwt het image uit de repo en leest de configuratie
+uit een `.env`-bestand:
+
+```bash
+cp .env.example .env        # en vul OVAPI_TPC (stap 1), LINE_FILTER, etc. in
+docker compose -f docker-compose.dev.yml up -d --build
+```
 
 ## Environment variables
 
