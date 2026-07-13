@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -33,6 +34,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
         await client.aclose()
 
 
@@ -47,7 +50,7 @@ app = FastAPI(
 async def departures(
     request: Request,
     line: str | None = Query(default=None, description="Override LINE_FILTER, comma-separated"),
-    limit: int | None = Query(default=None, ge=1, description="Override LIMIT"),
+    limit: int | None = Query(default=None, ge=1, le=50, description="Override LIMIT"),
 ) -> dict:
     settings = request.app.state.settings
     cache: DepartureCache = request.app.state.cache
@@ -62,6 +65,7 @@ async def departures(
     return {
         "stop_name": cache.stop_name,
         "updated": cache.updated.isoformat() if cache.updated else None,
+        "age_seconds": cache.age_seconds(),
         "stale": cache.stale,
         "departures": build_departures(
             cache.passes, now=now, line_filter=line_filter, limit=effective_limit
@@ -77,5 +81,7 @@ async def health(request: Request) -> dict:
     return {
         "status": "ok" if not cache.stale else "degraded",
         "last_update": cache.updated.isoformat() if cache.updated else None,
+        "age_seconds": cache.age_seconds(),
         "consecutive_failures": cache.consecutive_failures,
+        "last_error": cache.last_error,
     }
