@@ -44,7 +44,12 @@ docker compose up -d
 curl http://localhost:8000/departures
 ```
 
-Nieuwe release uitrollen: `docker compose pull && docker compose up -d`.
+**Updaten:** `docker compose pull && docker compose up -d` (de stack volgt `:latest`).
+
+**Terugrollen:** zet in de compose tijdelijk een specifieke versietag (bv.
+`image: ghcr.io/lucasplug/ovapi-departures-proxy:1.0.0`) of een image-digest
+(`docker images --digests`), en draai `docker compose up -d`. Terug naar
+nieuwste: tag weer op `:latest` zetten en opnieuw pullen.
 
 **Lokaal ontwikkelen** (bouwt uit de broncode, leest `.env`):
 
@@ -88,6 +93,7 @@ Het antwoord is bewust een **object** met top-level keys (geen kale array), zoda
 {
   "stop_name": "Katwijk, Gemeentehuis",
   "updated": "2026-07-12T16:50:12+02:00",
+  "age_seconds": 42,
   "stale": false,
   "departures": [
     {
@@ -103,11 +109,11 @@ Het antwoord is bewust een **object** met top-level keys (geen kale array), zoda
 }
 ```
 
-Een lege `departures`-lijst (bv. 's nachts) is een geldige respons, geen fout. `stale: true` betekent: de laatste OVapi-poll mislukte, dit is de laatst bekende goede data.
+Een lege `departures`-lijst (bv. 's nachts) is een geldige respons, geen fout. `stale: true` betekent: de laatste OVapi-poll mislukte, dit is de laatst bekende goede data. Met `age_seconds` (leeftijd van de cache) zie je het verschil tussen één mislukte poll en data die al uren oud is.
 
 ### `GET /health`
 
-Geeft altijd `200` zolang de webserver draait, met `status: "ok"` of `"degraded"` in de body. Wordt gebruikt door de Docker `HEALTHCHECK`.
+Geeft altijd `200` zolang de webserver draait, met `status: "ok"` of `"degraded"`, plus `age_seconds`, `consecutive_failures` en `last_error` in de body. Wordt gebruikt door de Docker `HEALTHCHECK`.
 
 ---
 
