@@ -32,10 +32,17 @@ class DepartureCache:
     updated: datetime | None = None
     consecutive_failures: int = 0
     has_data: bool = False
+    last_error: str | None = None
 
     @property
     def stale(self) -> bool:
         return self.consecutive_failures > 0 or not self.has_data
+
+    def age_seconds(self) -> int | None:
+        """Seconds since the last successful OVapi fetch, or None if never."""
+        if self.updated is None:
+            return None
+        return max(0, int((datetime.now(OVAPI_TZ) - self.updated).total_seconds()))
 
 
 async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: DepartureCache) -> None:
@@ -45,8 +52,9 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
         response = await client.get(url)
         response.raise_for_status()
         stop_name, passes = parse_tpc_response(response.json())
-    except Exception:
+    except Exception as exc:
         cache.consecutive_failures += 1
+        cache.last_error = f"{type(exc).__name__}: {exc}"
         logger.exception(
             "OVapi poll failed (attempt %d); serving cached data as stale",
             cache.consecutive_failures,
@@ -58,6 +66,7 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
     cache.updated = datetime.now(OVAPI_TZ)
     cache.consecutive_failures = 0
     cache.has_data = True
+    cache.last_error = None
     logger.info("OVapi poll ok: %d passes at %s", len(passes), stop_name)
 
 

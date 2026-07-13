@@ -8,6 +8,17 @@ services:
     image: ghcr.io/lucasplug/ovapi-departures-proxy:latest
     container_name: ovapi-departures
     restart: unless-stopped
+    # Lichte hardening: de service heeft geen extra privileges of schrijfbare
+    # bestandslaag nodig; /tmp is een tmpfs voor het geval een lib er iets kwijt wil.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    cpus: 0.50
     environment:
       # TimingPointCode: 54460130 = Katwijk, Gemeentehuis richting Den Haag CS
       OVAPI_TPC: "54460130"

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_POLL_INTERVAL_SECONDS = 180
 MIN_POLL_INTERVAL_SECONDS = 60
+MAX_POLL_INTERVAL_SECONDS = 3600
 DEFAULT_USER_AGENT = (
     "ovapi-departures-proxy/1.0 (+https://github.com/lucasplug/ovapi-departures-proxy)"
 )
@@ -58,6 +59,13 @@ def load_settings() -> Settings:
             MIN_POLL_INTERVAL_SECONDS,
         )
         poll_interval = MIN_POLL_INTERVAL_SECONDS
+    elif poll_interval > MAX_POLL_INTERVAL_SECONDS:
+        logger.warning(
+            "POLL_INTERVAL_SECONDS=%d would make the data very stale; clamping to %d",
+            poll_interval,
+            MAX_POLL_INTERVAL_SECONDS,
+        )
+        poll_interval = MAX_POLL_INTERVAL_SECONDS
 
     line_filter = tuple(
         part.strip()
@@ -69,12 +77,22 @@ def load_settings() -> Settings:
     if limit < 0:
         limit = 0
 
+    port = _int_env("PORT", DEFAULT_PORT)
+    if not 1 <= port <= 65535:
+        raise RuntimeError(f"PORT={port} is invalid; must be between 1 and 65535")
+
+    base_url = (os.environ.get("OVAPI_BASE_URL", "").strip() or DEFAULT_BASE_URL).rstrip("/")
+    if not base_url.startswith(("http://", "https://")):
+        raise RuntimeError(
+            f"OVAPI_BASE_URL={base_url!r} is invalid; only http:// and https:// are supported"
+        )
+
     return Settings(
         tpc=tpc,
         poll_interval_seconds=poll_interval,
         user_agent=os.environ.get("USER_AGENT", "").strip() or DEFAULT_USER_AGENT,
-        port=_int_env("PORT", DEFAULT_PORT),
+        port=port,
         line_filter=line_filter,
         limit=limit,
-        base_url=os.environ.get("OVAPI_BASE_URL", "").strip() or DEFAULT_BASE_URL,
+        base_url=base_url,
     )

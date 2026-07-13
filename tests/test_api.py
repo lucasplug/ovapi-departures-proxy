@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -27,6 +28,13 @@ def client(monkeypatch):
     from app.main import app
 
     with TestClient(app) as test_client:
+        # Wait for the first (deliberately failing) poll so it cannot race
+        # with tests that populate the cache afterwards; the next poll is
+        # an hour away (POLL_INTERVAL_SECONDS=3600).
+        cache = app.state.cache
+        deadline = time.monotonic() + 5
+        while cache.consecutive_failures == 0 and time.monotonic() < deadline:
+            time.sleep(0.02)
         yield test_client
 
 
@@ -66,7 +74,8 @@ def test_departures_shape_and_env_filtering(client):
     assert response.status_code == 200
     body = response.json()
 
-    assert set(body) == {"stop_name", "updated", "stale", "departures"}
+    assert set(body) == {"stop_name", "updated", "age_seconds", "stale", "departures"}
+    assert body["age_seconds"] >= 0
     assert body["stop_name"] == "Katwijk, Gemeentehuis"
     assert body["stale"] is False
     # LINE_FILTER=385 and LIMIT=4 from the environment apply.
@@ -81,9 +90,16 @@ def test_departures_query_params_override_env(client):
     assert body["departures"][0]["line"] == "31"
 
 
+def test_departures_limit_is_bounded(client):
+    assert client.get("/departures", params={"limit": 51}).status_code == 422
+    assert client.get("/departures", params={"limit": 0}).status_code == 422
+
+
 def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] in {"ok", "degraded"}
     assert "consecutive_failures" in body
+    assert "age_seconds" in body
+    assert "last_error" in body
