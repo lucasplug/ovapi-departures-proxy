@@ -54,3 +54,7 @@ def test_base_url_requires_http_scheme(monkeypatch):
 def test_negative_limit_becomes_unlimited(monkeypatch):
     monkeypatch.setenv("LIMIT", "-3")
     assert load_settings().limit == 0
+
+def test_invalid_non_numeric_port_falls_back(monkeypatch):
+    monkeypatch.setenv("PORT", "not-a-number")
+    assert load_settings().port == 8000
