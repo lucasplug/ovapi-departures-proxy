@@ -18,7 +18,14 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.ovapi import OVAPI_TZ, build_departures, parse_ovapi_time, parse_tpc_response
+from app.ovapi import (
+    OVAPI_TZ,
+    Pass,
+    build_departures,
+    parse_ovapi_time,
+    parse_tpc_response,
+)
+from app.poller import DepartureCache
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -135,3 +142,50 @@ def test_live_fixture_parses():
             "minutes_until",
         }
         assert record["minutes_until"] >= 0
+
+def test_fall_back_ambiguous_time_uses_last_update_offset():
+    payload = {
+        "54460131": {
+            "Stop": {"TimingPointName": "Katwijk, Gemeentehuis"},
+            "Passes": {
+                "trip": {
+                    "LastUpdateTimeStamp": "2026-10-25T02:10:00+01:00",
+                    "TargetDepartureTime": "2026-10-25T02:50:00",
+                    "ExpectedDepartureTime": "2026-10-25T02:50:00",
+                    "TripStopStatus": "DRIVING",
+                    "LinePublicNumber": "385",
+                    "DestinationName50": "Den Haag CS",
+                    "TransportType": "BUS",
+                }
+            },
+        }
+    }
+    _, passes = parse_tpc_response(payload)
+    now = datetime(2026, 10, 25, 2, 10, tzinfo=OVAPI_TZ, fold=1)
+    departures = build_departures(passes, now=now)
+
+    assert passes[0].expected.fold == 1
+    assert departures[0]["expected"] == "2026-10-25T02:50:00+01:00"
+    assert departures[0]["minutes_until"] == 40
+
+
+def test_fall_back_drops_departure_from_first_fold():
+    departed = Pass(
+        line="385",
+        destination="Den Haag CS",
+        transport_type="BUS",
+        planned=datetime(2026, 10, 25, 2, 50, tzinfo=OVAPI_TZ, fold=0),
+        expected=datetime(2026, 10, 25, 2, 50, tzinfo=OVAPI_TZ, fold=0),
+        status="DRIVING",
+    )
+    now = datetime(2026, 10, 25, 2, 10, tzinfo=OVAPI_TZ, fold=1)
+
+    assert build_departures([departed], now=now) == []
+
+
+def test_cache_age_uses_elapsed_time_across_fall_back():
+    updated = datetime(2026, 10, 25, 2, 50, tzinfo=OVAPI_TZ, fold=0)
+    now = datetime(2026, 10, 25, 2, 10, tzinfo=OVAPI_TZ, fold=1)
+    cache = DepartureCache(updated=updated)
+
+    assert cache.age_seconds(now=now) == 20 * 60
