@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, Response
 
 from .config import load_settings
 from .ovapi import OVAPI_TZ, build_departures
@@ -83,5 +83,20 @@ async def health(request: Request) -> dict:
         "last_update": cache.updated.isoformat() if cache.updated else None,
         "age_seconds": cache.age_seconds(),
         "consecutive_failures": cache.consecutive_failures,
+        "last_error": cache.last_error,
+    }
+
+
+@app.get("/ready")
+async def ready(request: Request, response: Response) -> dict:
+    """Report whether at least one OVapi response has been cached successfully."""
+    cache: DepartureCache = request.app.state.cache
+    if not cache.has_data:
+        response.status_code = 503
+    return {
+        "status": "ready" if cache.has_data else "not_ready",
+        "last_update": cache.updated.isoformat() if cache.updated else None,
+        "age_seconds": cache.age_seconds(),
+        "stale": cache.stale,
         "last_error": cache.last_error,
     }
