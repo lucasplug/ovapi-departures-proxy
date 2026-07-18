@@ -1,0 +1,11 @@
+# Lokale geheimen en ontwikkelartefacten horen niet in de Docker-buildcontext.
+.env
+.env.*
+!.env.example
+.git
+.github
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
