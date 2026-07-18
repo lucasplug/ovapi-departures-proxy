@@ -91,11 +91,17 @@ def parse_ovapi_time(
     return selected
 
 
-def parse_tpc_response(payload: dict[str, Any]) -> tuple[str | None, list[Pass]]:
+def parse_tpc_response(
+    payload: dict[str, Any],
+    *,
+    reference: datetime | None = None,
+) -> tuple[str | None, list[Pass]]:
     """Extract the stop name and all passes from a /tpc/<TPC> response.
 
     The top-level key is the (dynamic) TimingPointCode, so the stop entry is
-    located by shape rather than by key.
+    located by shape rather than by key. ``reference`` is the poll time and
+    disambiguates naive timestamps during the repeated DST hour when a journey
+    has no usable ``LastUpdateTimeStamp``.
     """
     stop_entry: dict[str, Any] | None = None
     for value in payload.values():
@@ -118,7 +124,11 @@ def parse_tpc_response(payload: dict[str, Any]) -> tuple[str | None, list[Pass]]
             continue
         status = str(journey.get("TripStopStatus", "")).upper()
         last_update_raw = journey.get("LastUpdateTimeStamp")
-        last_update = parse_ovapi_time(last_update_raw) if last_update_raw else None
+        last_update = (
+            parse_ovapi_time(last_update_raw, reference=reference)
+            if last_update_raw
+            else reference
+        )
         expected = parse_ovapi_time(
             expected_raw,
             reference=last_update,
