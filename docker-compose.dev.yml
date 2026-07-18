@@ -12,4 +12,4 @@ services:
     environment:
       TZ: Europe/Amsterdam
     ports:
-      - "${PORT:-8000}:${PORT:-8000}"
+      - "${HOST_PORT:-8001}:${PORT:-8000}"
