@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -38,11 +38,13 @@ class DepartureCache:
     def stale(self) -> bool:
         return self.consecutive_failures > 0 or not self.has_data
 
-    def age_seconds(self) -> int | None:
+    def age_seconds(self, now: datetime | None = None) -> int | None:
         """Seconds since the last successful OVapi fetch, or None if never."""
         if self.updated is None:
             return None
-        return max(0, int((datetime.now(OVAPI_TZ) - self.updated).total_seconds()))
+        now = now or datetime.now(timezone.utc)
+        elapsed = now.astimezone(timezone.utc) - self.updated.astimezone(timezone.utc)
+        return max(0, int(elapsed.total_seconds()))
 
 
 async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: DepartureCache) -> None:
