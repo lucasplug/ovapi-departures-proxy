@@ -1,17 +1,12 @@
 # Portainer-ready: alle configuratie staat inline, er is geen .env nodig.
 # Plak dit als stack in Portainer (Stacks -> Add stack) of wijs naar deze repo.
 #
-# Andere poort? Pas dan PORT én beide kanten van de ports-mapping aan
-# (compose vult ${...} niet uit het environment-blok).
+# Andere hostpoort? Pas alleen het getal links in de ports-mapping aan.
+# De app blijft in de container op PORT 8000 luisteren.
 services:
   ovapi-departures:
     image: ghcr.io/lucasplug/ovapi-departures-proxy:latest
     restart: unless-stopped
-    # Gebruik vaste resolvers wanneer Docker's ingebouwde DNS de OVapi-host
-    # niet via de DNS-configuratie van de host kan opzoeken.
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
     # Lichte hardening: de service heeft geen extra privileges of schrijfbare
     # bestandslaag nodig; /tmp is een tmpfs voor het geval een lib er iets kwijt wil.
     security_opt:
@@ -29,6 +24,7 @@ services:
       # Fair use richting OVapi: minimaal 60, default 180 (seconden)
       POLL_INTERVAL_SECONDS: "180"
       USER_AGENT: "ovapi-departures-proxy/1.0 (+https://github.com/lucasplug/ovapi-departures-proxy)"
+      # Interne containerpoort; de host gebruikt hieronder poort 8001.
       PORT: "8000"
       # Alleen deze lijnen tonen (comma-separated); leeg = alle lijnen
       LINE_FILTER: "385"
@@ -36,4 +32,4 @@ services:
       LIMIT: "4"
       TZ: "Europe/Amsterdam"
     ports:
-      - "8000:8000"
+      - "8001:8000"
