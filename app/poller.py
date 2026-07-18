@@ -53,7 +53,8 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
     try:
         response = await client.get(url)
         response.raise_for_status()
-        stop_name, passes = parse_tpc_response(response.json())
+        fetched_at = datetime.now(OVAPI_TZ)
+        stop_name, passes = parse_tpc_response(response.json(), reference=fetched_at)
     except Exception as exc:
         cache.consecutive_failures += 1
         cache.last_error = f"{type(exc).__name__}: {exc}"
@@ -65,7 +66,7 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
 
     cache.stop_name = stop_name or cache.stop_name
     cache.passes = passes
-    cache.updated = datetime.now(OVAPI_TZ)
+    cache.updated = fetched_at
     cache.consecutive_failures = 0
     cache.has_data = True
     cache.last_error = None
