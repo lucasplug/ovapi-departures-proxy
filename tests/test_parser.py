@@ -143,6 +143,7 @@ def test_live_fixture_parses():
         }
         assert record["minutes_until"] >= 0
 
+
 def test_fall_back_ambiguous_time_uses_last_update_offset():
     payload = {
         "54460131": {
@@ -189,3 +190,28 @@ def test_cache_age_uses_elapsed_time_across_fall_back():
     cache = DepartureCache(updated=updated)
 
     assert cache.age_seconds(now=now) == 20 * 60
+
+
+def test_fall_back_ambiguous_time_uses_poll_reference_without_last_update():
+    payload = {
+        "54460131": {
+            "Stop": {"TimingPointName": "Katwijk, Gemeentehuis"},
+            "Passes": {
+                "trip": {
+                    "TargetDepartureTime": "2026-10-25T02:50:00",
+                    "ExpectedDepartureTime": "2026-10-25T02:50:00",
+                    "TripStopStatus": "DRIVING",
+                    "LinePublicNumber": "385",
+                    "DestinationName50": "Den Haag CS",
+                    "TransportType": "BUS",
+                }
+            },
+        }
+    }
+    poll_time = datetime(2026, 10, 25, 2, 10, tzinfo=OVAPI_TZ, fold=1)
+    _, passes = parse_tpc_response(payload, reference=poll_time)
+    departures = build_departures(passes, now=poll_time)
+
+    assert passes[0].expected.fold == 1
+    assert departures[0]["expected"] == "2026-10-25T02:50:00+01:00"
+    assert departures[0]["minutes_until"] == 40
