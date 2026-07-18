@@ -6,7 +6,6 @@
 services:
   ovapi-departures:
     image: ghcr.io/lucasplug/ovapi-departures-proxy:latest
-    container_name: ovapi-departures
     restart: unless-stopped
     # Lichte hardening: de service heeft geen extra privileges of schrijfbare
     # bestandslaag nodig; /tmp is een tmpfs voor het geval een lib er iets kwijt wil.
