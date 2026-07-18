@@ -21,7 +21,8 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Geen curl in een slim image: gebruik een python/urllib-oneliner.
+# /ready geeft pas 200 nadat ten minste één OVapi-respons is opgehaald.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD ["python", "-c", "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8000'), timeout=4)"]
+    CMD ["python", "-c", "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/ready' % os.environ.get('PORT', '8000'), timeout=4)"]
 
 CMD ["python", "-m", "app"]
