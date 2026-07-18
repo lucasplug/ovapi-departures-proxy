@@ -11,11 +11,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Validate Compose files
+        run: |
+          docker compose -f docker-compose.yml config
+          cp .env.example .env
+          docker compose -f docker-compose.dev.yml config
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -49,7 +58,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
