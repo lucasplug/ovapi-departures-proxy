@@ -43,6 +43,14 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def load_port() -> int:
+    """Load and validate the HTTP port for both Uvicorn and app settings."""
+    port = _int_env("PORT", DEFAULT_PORT)
+    if not 1 <= port <= 65535:
+        raise RuntimeError(f"PORT={port} is invalid; must be between 1 and 65535")
+    return port
+
+
 def load_settings() -> Settings:
     tpc = os.environ.get("OVAPI_TPC", "").strip()
     if not tpc:
@@ -77,10 +85,6 @@ def load_settings() -> Settings:
     if limit < 0:
         limit = 0
 
-    port = _int_env("PORT", DEFAULT_PORT)
-    if not 1 <= port <= 65535:
-        raise RuntimeError(f"PORT={port} is invalid; must be between 1 and 65535")
-
     base_url = (os.environ.get("OVAPI_BASE_URL", "").strip() or DEFAULT_BASE_URL).rstrip("/")
     if not base_url.startswith(("http://", "https://")):
         raise RuntimeError(
@@ -91,7 +95,7 @@ def load_settings() -> Settings:
         tpc=tpc,
         poll_interval_seconds=poll_interval,
         user_agent=os.environ.get("USER_AGENT", "").strip() or DEFAULT_USER_AGENT,
-        port=port,
+        port=load_port(),
         line_filter=line_filter,
         limit=limit,
         base_url=base_url,
