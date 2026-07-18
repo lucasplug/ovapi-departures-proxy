@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
@@ -54,7 +56,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and Push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
