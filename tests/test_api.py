@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -42,15 +42,19 @@ def _load_cache_from_fixture(client: TestClient) -> None:
     payload = json.loads((FIXTURES / "tpc_sample.json").read_text())
     stop_name, passes = parse_tpc_response(payload)
     cache = client.app.state.cache
-    # Shift the fixture passes to the future relative to the real "now".
-    offset = datetime.now(OVAPI_TZ) - datetime(2026, 7, 12, 16, 50, 0, tzinfo=OVAPI_TZ)
+    # Shift absolute instants in UTC so this remains correct during the
+    # repeated local hour when daylight saving time ends.
+    fixture_now_utc = datetime(
+        2026, 7, 12, 16, 50, 0, tzinfo=OVAPI_TZ
+    ).astimezone(timezone.utc)
+    offset = datetime.now(timezone.utc) - fixture_now_utc
     cache.passes = [
         Pass(
             line=p.line,
             destination=p.destination,
             transport_type=p.transport_type,
-            planned=p.planned + offset,
-            expected=p.expected + offset,
+            planned=(p.planned.astimezone(timezone.utc) + offset).astimezone(OVAPI_TZ),
+            expected=(p.expected.astimezone(timezone.utc) + offset).astimezone(OVAPI_TZ),
             status=p.status,
         )
         for p in passes
@@ -59,6 +63,7 @@ def _load_cache_from_fixture(client: TestClient) -> None:
     cache.updated = datetime.now(OVAPI_TZ)
     cache.consecutive_failures = 0
     cache.has_data = True
+    cache.last_error = None
 
 
 def test_departures_before_first_successful_poll(client):
@@ -103,3 +108,16 @@ def test_health_endpoint(client):
     assert "consecutive_failures" in body
     assert "age_seconds" in body
     assert "last_error" in body
+
+
+def test_readiness_requires_first_successful_poll(client):
+    response = client.get("/ready")
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+
+    _load_cache_from_fixture(client)
+    response = client.get("/ready")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["last_update"] is not None
