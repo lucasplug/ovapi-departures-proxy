@@ -7,6 +7,11 @@ services:
   ovapi-departures:
     image: ghcr.io/lucasplug/ovapi-departures-proxy:latest
     restart: unless-stopped
+    # Gebruik vaste resolvers wanneer Docker's ingebouwde DNS de OVapi-host
+    # niet via de DNS-configuratie van de host kan opzoeken.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     # Lichte hardening: de service heeft geen extra privileges of schrijfbare
     # bestandslaag nodig; /tmp is een tmpfs voor het geval een lib er iets kwijt wil.
     security_opt:
