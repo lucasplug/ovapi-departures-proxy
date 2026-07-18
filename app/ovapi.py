@@ -9,14 +9,16 @@ works when the container clock runs in UTC.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
 OVAPI_TZ = ZoneInfo("Europe/Amsterdam")
+UTC = timezone.utc
 
 # Passes in these states are gone or not coming; never show them.
 _SKIPPED_STATUSES = frozenset({"PASSED", "CANCEL", "CANCELLED"})
+_AMBIGUOUS_TIME_GRACE_SECONDS = 15 * 60
 
 
 @dataclass(frozen=True)
@@ -31,17 +33,62 @@ class Pass:
     status: str
 
 
-def parse_ovapi_time(value: str) -> datetime:
+def _as_utc(value: datetime) -> datetime:
+    """Normalize an aware datetime before comparing or subtracting it."""
+    return value.astimezone(UTC)
+
+
+def parse_ovapi_time(
+    value: str,
+    *,
+    reference: datetime | None = None,
+    prefer_future: bool | None = None,
+) -> datetime:
     """Parse an OVapi timestamp.
 
     OVapi sends naive local times like ``2026-07-12T16:58:00``; those are
-    interpreted as Europe/Amsterdam. Timestamps that do carry an offset
-    (e.g. LastUpdateTimeStamp) are kept as-is.
+    interpreted as Europe/Amsterdam. During the repeated hour when daylight
+    saving time ends, ``LastUpdateTimeStamp`` is used as a reference to select
+    the correct fold. Timestamps that carry an offset are kept as-is.
     """
     dt = datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=OVAPI_TZ)
-    return dt
+    if dt.tzinfo is not None:
+        return dt
+
+    early = dt.replace(tzinfo=OVAPI_TZ, fold=0)
+    late = dt.replace(tzinfo=OVAPI_TZ, fold=1)
+    if early.utcoffset() == late.utcoffset() or reference is None:
+        return early
+
+    candidates = (early, late)
+    reference_utc = _as_utc(reference)
+    matching_offset = next(
+        (candidate for candidate in candidates if candidate.utcoffset() == reference.utcoffset()),
+        None,
+    )
+    selected = matching_offset or min(
+        candidates,
+        key=lambda candidate: abs((_as_utc(candidate) - reference_utc).total_seconds()),
+    )
+    alternative = late if selected is early else early
+    selected_delta = (_as_utc(selected) - reference_utc).total_seconds()
+    alternative_delta = (_as_utc(alternative) - reference_utc).total_seconds()
+
+    # A journey may be updated a few minutes after its expected departure, so
+    # only cross to the other fold when the direction mismatch is substantial.
+    if (
+        prefer_future is True
+        and selected_delta < -_AMBIGUOUS_TIME_GRACE_SECONDS
+        and alternative_delta >= 0
+    ):
+        return alternative
+    if (
+        prefer_future is False
+        and selected_delta > _AMBIGUOUS_TIME_GRACE_SECONDS
+        and alternative_delta <= 0
+    ):
+        return alternative
+    return selected
 
 
 def parse_tpc_response(payload: dict[str, Any]) -> tuple[str | None, list[Pass]]:
@@ -69,14 +116,22 @@ def parse_tpc_response(payload: dict[str, Any]) -> tuple[str | None, list[Pass]]
         expected_raw = journey.get("ExpectedDepartureTime") or planned_raw
         if not expected_raw:
             continue
+        status = str(journey.get("TripStopStatus", "")).upper()
+        last_update_raw = journey.get("LastUpdateTimeStamp")
+        last_update = parse_ovapi_time(last_update_raw) if last_update_raw else None
+        expected = parse_ovapi_time(
+            expected_raw,
+            reference=last_update,
+            prefer_future=status not in _SKIPPED_STATUSES,
+        )
         passes.append(
             Pass(
                 line=str(journey.get("LinePublicNumber", "")),
                 destination=str(journey.get("DestinationName50", "")),
                 transport_type=str(journey.get("TransportType", "")),
-                planned=parse_ovapi_time(planned_raw or expected_raw),
-                expected=parse_ovapi_time(expected_raw),
-                status=str(journey.get("TripStopStatus", "")).upper(),
+                planned=parse_ovapi_time(planned_raw or expected_raw, reference=expected),
+                expected=expected,
+                status=status,
             )
         )
     return stop_name, passes
@@ -95,15 +150,17 @@ def build_departures(
     ``now`` at request time, so it stays fresh between OVapi polls.
     """
     departures: list[dict[str, Any]] = []
-    for p in sorted(passes, key=lambda p: p.expected):
+    now_utc = _as_utc(now)
+    for p in sorted(passes, key=lambda item: _as_utc(item.expected)):
         if p.status in _SKIPPED_STATUSES:
             continue
-        if p.expected < now:
+        expected_utc = _as_utc(p.expected)
+        if expected_utc < now_utc:
             continue
         if line_filter and p.line not in line_filter:
             continue
-        delay_minutes = round((p.expected - p.planned).total_seconds() / 60)
-        minutes_until = int((p.expected - now).total_seconds() // 60)
+        delay_minutes = round((expected_utc - _as_utc(p.planned)).total_seconds() / 60)
+        minutes_until = int((expected_utc - now_utc).total_seconds() // 60)
         departures.append(
             {
                 "line": p.line,
