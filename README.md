@@ -174,6 +174,81 @@ content: >-
   {% endif %}
 ```
 
+### Losse Home Assistant-sensoren voor dashboardvelden
+
+Wil je de busdata tonen zoals losse dashboardvelden (bijvoorbeeld net als
+CPU/RAM-kolommen), maak dan aparte template-sensoren op basis van het
+`departures`-attribuut van de REST-sensor. Onderstaand voorbeeld maakt velden
+voor de eerstvolgende bus en de bus daarna:
+
+```yaml
+template:
+  - sensor:
+      - name: "Bus 385 eerstvolgende minuten"
+        unique_id: bus_385_eerstvolgende_minuten
+        icon: mdi:bus-clock
+        unit_of_measurement: "min"
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 0 }}
+        state: >-
+          {{ state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[0].minutes_until }}
+
+      - name: "Bus 385 eerstvolgende tijd"
+        unique_id: bus_385_eerstvolgende_tijd
+        icon: mdi:clock-outline
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 0 }}
+        state: >-
+          {{ as_timestamp(state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[0].expected) | timestamp_custom('%H:%M') }}
+
+      - name: "Bus 385 eerstvolgende vertraging"
+        unique_id: bus_385_eerstvolgende_vertraging
+        icon: mdi:timer-alert-outline
+        unit_of_measurement: "min"
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 0 }}
+        state: >-
+          {{ state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[0].delay_minutes }}
+
+      - name: "Bus 385 tweede minuten"
+        unique_id: bus_385_tweede_minuten
+        icon: mdi:bus-clock
+        unit_of_measurement: "min"
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 1 }}
+        state: >-
+          {{ state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[1].minutes_until }}
+
+      - name: "Bus 385 tweede tijd"
+        unique_id: bus_385_tweede_tijd
+        icon: mdi:clock-outline
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 1 }}
+        state: >-
+          {{ as_timestamp(state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[1].expected) | timestamp_custom('%H:%M') }}
+
+      - name: "Bus 385 tweede vertraging"
+        unique_id: bus_385_tweede_vertraging
+        icon: mdi:timer-alert-outline
+        unit_of_measurement: "min"
+        availability: >-
+          {% set d = state_attr('sensor.bus_385_naar_den_haag_cs', 'departures') %}
+          {{ d is sequence and d | count > 1 }}
+        state: >-
+          {{ state_attr('sensor.bus_385_naar_den_haag_cs', 'departures')[1].delay_minutes }}
+```
+
+Daarna kun je in Lovelace elk veld apart gebruiken, bijvoorbeeld
+`sensor.bus_385_eerstvolgende_minuten`, `sensor.bus_385_eerstvolgende_tijd`,
+`sensor.bus_385_eerstvolgende_vertraging`, en dezelfde drie voor
+`sensor.bus_385_tweede_*`. Als er geen tweede bus bekend is, blijven de tweede
+sensoren `unavailable` in plaats van een tekstwaarde zoals "Geen tweede bus".
+
 Alternatief: met [flex-table-card](https://github.com/custom-cards/flex-table-card) (via HACS) kun je de `departures`-attribuutlijst als nette tabel tonen.
 
 ---
