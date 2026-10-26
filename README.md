@@ -12,6 +12,7 @@ Een lichte Docker-container die realtime OV-vertrektijden van **OVapi** (v0.ovap
 - 🔍 Filteren op lijn en aantal vertrekken
 - 🛡️ Fair use: pollinterval minimaal 60 s + identificerende User-Agent
 - 💾 Bij een OVapi-storing wordt de laatste goede data geserveerd (`stale: true`)
+- 🐢 Tijdens een storing verdubbelt het pollinterval per mislukte poging (maximaal 15 minuten) en staat alleen bij de eerste fout een traceback in de log
 - 🏠 Kant-en-klare Home Assistant REST-sensor en Lovelace-kaart
 - 🐳 Docker Compose / Portainer ondersteuning
 
@@ -69,7 +70,7 @@ Alle configuratie gaat via environment variables; intervallen zijn in **seconden
 | Variabele | Omschrijving | Standaard |
 |------------|--------------|-----------|
 | `OVAPI_TPC` | TimingPointCode van je halte-richting | *(verplicht)* |
-| `POLL_INTERVAL_SECONDS` | Pollinterval richting OVapi; minimum 60 (lager wordt geclampt) | `180` |
+| `POLL_INTERVAL_SECONDS` | Pollinterval richting OVapi; minimum 60 (lager wordt geclampt). Bij aanhoudende fouten loopt dit op tot maximaal 15 minuten | `180` |
 | `USER_AGENT` | Identificerende User-Agent richting OVapi | projectnaam + repo-URL |
 | `PORT` | Interne poort van de HTTP-API in de container | `8000` |
 | `HOST_PORT` | Hostpoort in `docker-compose.dev.yml`; pas voor productie de linkerkant van `ports:` aan | `8001` |

@@ -3,7 +3,9 @@
 Fair use: OVapi is a semi-private, non-commercial project. The poll interval
 is clamped to at least 60 seconds (see config) and every request carries an
 identifying User-Agent. On errors the last good data is kept and served with
-``stale: true`` instead of failing.
+``stale: true`` instead of failing. While OVapi keeps failing, the interval
+backs off exponentially (capped at MAX_BACKOFF_SECONDS) and only the first
+failure is logged with a traceback.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from .ovapi import OVAPI_TZ, Pass, parse_tpc_response
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 15
+MAX_BACKOFF_SECONDS = 900
 
 
 @dataclass
@@ -58,11 +61,18 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
     except Exception as exc:
         cache.consecutive_failures += 1
         cache.last_error = f"{type(exc).__name__}: {exc}"
-        logger.exception(
-            "OVapi poll failed (attempt %d); serving cached data as stale",
-            cache.consecutive_failures,
-        )
+        if cache.consecutive_failures == 1:
+            logger.exception("OVapi poll failed; serving cached data as stale")
+        else:
+            logger.warning(
+                "OVapi poll failed (attempt %d): %s",
+                cache.consecutive_failures,
+                cache.last_error,
+            )
         return
+
+    if cache.consecutive_failures:
+        logger.info("OVapi reachable again after %d failed polls", cache.consecutive_failures)
 
     cache.stop_name = stop_name or cache.stop_name
     cache.passes = passes
@@ -71,6 +81,15 @@ async def poll_once(client: httpx.AsyncClient, settings: Settings, cache: Depart
     cache.has_data = True
     cache.last_error = None
     logger.info("OVapi poll ok: %d passes at %s", len(passes), stop_name)
+
+
+def next_delay(settings: Settings, consecutive_failures: int) -> int:
+    """Seconds until the next poll: the configured interval, doubled per
+    consecutive failure so an OVapi outage is not hammered (fair use)."""
+    if consecutive_failures <= 0:
+        return settings.poll_interval_seconds
+    backoff = settings.poll_interval_seconds * 2 ** min(consecutive_failures - 1, 10)
+    return max(settings.poll_interval_seconds, min(backoff, MAX_BACKOFF_SECONDS))
 
 
 async def poll_loop(client: httpx.AsyncClient, settings: Settings, cache: DepartureCache) -> None:
@@ -82,4 +101,4 @@ async def poll_loop(client: httpx.AsyncClient, settings: Settings, cache: Depart
     )
     while True:
         await poll_once(client, settings, cache)
-        await asyncio.sleep(settings.poll_interval_seconds)
+        await asyncio.sleep(next_delay(settings, cache.consecutive_failures))
