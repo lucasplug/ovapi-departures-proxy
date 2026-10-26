@@ -25,7 +25,7 @@ jobs:
           docker compose -f docker-compose.yml config
           cp .env.example .env
           docker compose -f docker-compose.dev.yml config
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
